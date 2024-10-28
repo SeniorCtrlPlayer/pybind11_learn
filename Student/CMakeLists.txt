@@ -6,5 +6,5 @@ message(STATUS "lwk " ${CMAKE_CURRENT_SOURCE_DIR})
 # SET(student_src ${CMAKE_CURRENT_SOURCE_DIR}/Student.cpp PARENT_SCOPE)
 
 set(student_src ${CMAKE_CURRENT_SOURCE_DIR}/Student.cpp)
-add_library(student STATIC ${student_src})
+add_library(student SHARED ${student_src})
 target_include_directories(student PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
