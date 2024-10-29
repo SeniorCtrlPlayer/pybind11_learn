@@ -12,7 +12,9 @@ set(student_src ${CMAKE_CURRENT_SOURCE_DIR}/Student.cpp)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
 add_library(student STATIC ${student_src})
-target_include_directories(student PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(student PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../inc)
 
 find_package(pybind11 REQUIRED)
 pybind11_add_module(stu ${CMAKE_CURRENT_SOURCE_DIR}/PyStudent.cpp)

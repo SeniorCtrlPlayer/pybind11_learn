@@ -1,17 +1,5 @@
 #include "Student.h"
-#include "json.hpp"
-#include "fstream"
-using json = nlohmann::json;
-
-void from_json(const json& j, Student& p) {
-    j.at("json_id").get_to(p.json_id);
-}
-
-void to_json(json& j, const Student& s) {
-    j = json{
-        {"json_id", s.json_id}
-    };
-}
+#include <fstream>
 
 void json_test() {
     std::string file_path = "./test.json";
@@ -45,8 +33,11 @@ void json_test() {
 
     Student s(9638);
     s.json_id = 960308;
-    to_json(root, s);
-    cout << "json id: " << s.json_id << endl;
+    // to_json(root, s);
+    root = s;
+    cout << root << endl;
+    Student s1 = root.template get<Student>();
+    cout << "json id: " << s1.json_id << endl;
     return;
 }
 
