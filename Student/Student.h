@@ -8,6 +8,7 @@ class Student {
         void setId(int id);
         void print();
         static void print1();
+        int json_id;
     private:
         int id;
 };
