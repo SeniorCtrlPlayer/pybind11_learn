@@ -1,6 +1,14 @@
 #include "Student.h"
 #include <fstream>
 
+class class_room {
+    public:
+        string teacher_name;
+        std::vector<Student> student_list;
+
+        NLOHMANN_DEFINE_TYPE_INTRUSIVE(class_room, teacher_name, student_list)
+};
+
 void json_test() {
     std::string file_path = "./test.json";
 
@@ -8,9 +16,14 @@ void json_test() {
     std::ifstream config_file(file_path);
     if (!config_file.is_open()) {
         cout << file_path << " not exist" << endl;
+        // root = R"({"json_id": 9638})"_json;
         root = R"(
             {
-                "json_id": 9638
+                "teacher_name": "lwk",
+                "student_list": [
+                    {"id": 9638},
+                    {"id": 96380}
+                ]
             }
         )"_json;
     } else {
@@ -31,13 +44,14 @@ void json_test() {
     os << root;
     os.close();
 
-    Student s(9638);
-    s.json_id = 960308;
+    // Student s(9638);
     // to_json(root, s);
-    root = s;
+    // root = s;
     cout << root << endl;
-    Student s1 = root.template get<Student>();
-    cout << "json id: " << s1.json_id << endl;
+    class_room s1 = root.template get<class_room>();
+    for (Student& stu : s1.student_list) {
+        stu.print();
+    }
     return;
 }
 

@@ -16,6 +16,7 @@ target_include_directories(student PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../inc)
 
+# interface for pybind11
 find_package(pybind11 REQUIRED)
 pybind11_add_module(stu ${CMAKE_CURRENT_SOURCE_DIR}/PyStudent.cpp)
 target_link_libraries(stu PRIVATE student)

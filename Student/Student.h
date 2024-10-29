@@ -13,7 +13,6 @@ class Student {
         void setId(int id);
         void print();
         static void print1();
-        int json_id;
 
-        NLOHMANN_DEFINE_TYPE_INTRUSIVE(Student, id, json_id)
+        NLOHMANN_DEFINE_TYPE_INTRUSIVE(Student, id)
 };

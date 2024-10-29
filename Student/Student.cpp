@@ -14,6 +14,4 @@ void Student::setId(int id) {
 
 void Student::print() {
     cout << "id: " << this->id << endl;
-    this->setId(111);
-    cout << "id: " << this->id << endl;
 }
