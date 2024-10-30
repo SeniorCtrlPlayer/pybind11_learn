@@ -176,61 +176,93 @@ public:
 };
 
 template<class Sax>
-void sax_event_creator(const json &j, Sax *sax) {
-    switch (j.type()) {
-        case nlohmann::detail::value_t::null: {
-            sax->null();
-            break;
-        }
-
-        case nlohmann::detail::value_t::object: {
-            sax->start_object(j.size());
-            for (auto &element: j.items()) {
-                sax->key(element.key());
-                sax_event_creator(element.value(), sax);
+void sax_event_creator_nr(const json &j, Sax *sax) {
+    auto handle_primitive_value = [](json::const_iterator it, Sax *sax) {
+        switch (it.m_object->type()) {
+            case nlohmann::json::value_t::number_integer: {
+                sax->number_integer(it->template get<json::number_integer_t>());
+                break;
             }
-            sax->end_object();
-            break;
-        }
 
-        case nlohmann::detail::value_t::array: {
-            bool tab = j.size() && (j[0].is_object() || j[0].is_array());
-            sax->start_array(tab);
-            for (auto &element: j) {
-                sax_event_creator(element, sax);
+            case nlohmann::detail::value_t::number_unsigned: {
+                sax->number_unsigned(it->template get<json::number_unsigned_t>());
+                break;
             }
-            sax->end_array(tab);
-            break;
+
+            case nlohmann::detail::value_t::number_float: {
+                sax->number_float(it->template get<json::number_float_t>(), "");
+                break;
+            }
+
+            case nlohmann::detail::value_t::null: {
+                sax->null();
+                break;
+            }
+
+            case nlohmann::detail::value_t::string: {
+                sax->string(it->template get_ref<const json::string_t &>());
+                break;
+            }
+
+            case nlohmann::detail::value_t::boolean: {
+                sax->boolean(it->template get<const json::boolean_t>());
+                break;
+            }
+
+            default:
+                break;
+        }
+    };
+
+    if (j.is_primitive()) {
+        handle_primitive_value(j.cbegin(), sax);
+        return;
+    }
+
+    std::vector<json::const_iterator> m_stack;
+    m_stack.push_back(j.cbegin());
+
+    while (!m_stack.empty()) {
+        auto &it = m_stack.back();
+        assert(it.m_object->is_structured());
+        const auto is_object = it.m_object->is_object();
+        std::size_t size = false;
+
+        // start before the first value
+        if (it == it.m_object->cbegin()) {
+            size = it.m_object->size();
+            // is_object ? sax->start_object(size) : sax->start_array(size);
+            if (is_object) {
+                sax->start_object(size);
+            } else {
+                bool tab = size && (it.m_object->cbegin()->is_object() || it.m_object->cbegin()->is_array());
+                sax->start_array(tab);
+            }
         }
 
-        case nlohmann::detail::value_t::string: {
-            sax->string(j.get_ref<const json::string_t&>());
-            break;
+        // end after the last value
+        if (it == it.m_object->end()) {
+            size = it.m_object->size();
+            if (is_object) {
+                sax->end_object();
+            } else {
+                bool tab = size && (it.m_object->cbegin()->is_object() || it.m_object->cbegin()->is_array());
+                sax->end_array(tab);
+            }
+            m_stack.pop_back();
+            continue;
         }
 
-        case nlohmann::detail::value_t::boolean: {
-            sax->boolean(j.get<json::boolean_t>());
-            break;
+        // handle the current value
+        if (is_object) {
+            sax->key(it.key());
         }
-
-        case nlohmann::detail::value_t::number_integer: {
-            sax->number_integer(j.get<json::number_integer_t>());
-            break;
+        auto it_current = it++->cbegin();
+        if (it_current.m_object->is_primitive()) {
+            handle_primitive_value(it_current, sax);
+        } else {
+            m_stack.push_back(it_current);
         }
-
-        case nlohmann::detail::value_t::number_unsigned: {
-            sax->number_unsigned(j.get<json::number_unsigned_t>());
-            break;
-        }
-
-        case nlohmann::detail::value_t::number_float: {
-            sax->number_float(j.get<json::number_float_t>(), "");
-            break;
-        }
-
-        case nlohmann::detail::value_t::binary:
-        case nlohmann::detail::value_t::discarded:
-            break;
     }
 }
 
@@ -250,13 +282,11 @@ void sax_test() {
     // std::cout << j << std::endl;
     SaxPrinter p;
 
-    sax_event_creator(j, &p);
-    std::cout << std::endl;
-
+    sax_event_creator_nr(j, &p);
+    cout << endl;
     // json::sax_parse(R"([[],[{},{}],{}])", &p);
     // std::cout << std::endl;
 }
-
 
 int main(int argc, char** argv) {
     Student* s = new Student(1);
