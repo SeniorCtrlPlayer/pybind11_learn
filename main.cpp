@@ -55,45 +55,54 @@ void json_test() {
     return;
 }
 
-class SaxPrinter {
+class SaxWriter {
 public:
-    ~SaxPrinter() {
+    SaxWriter(const string& file_name) {
+        o = std::ofstream(file_name);
+        if (!o.is_open()) {
+            cerr << "open file failed" << endl;
+            return;
+        }
+    }
+    // SaxWriter(std::ostream& out) : o(out) {}
+    ~SaxWriter() {
+        o.close();
         assert(last_value.empty());
     }
 
     bool null() {
         print_comma();
-        std::cout << "null";
+        o << "null";
         return true;
     }
 
     bool boolean(bool value) {
         print_comma();
-        std::cout << (value ? "true" : "false");
+        o << (value ? "true" : "false");
         return true;
     }
 
     bool number_integer(json::number_integer_t value) {
         print_comma();
-        std::cout << value;
+        o << value;
         return true;
     }
 
     bool number_unsigned(json::number_unsigned_t value) {
         print_comma();
-        std::cout << value;
+        o << value;
         return true;
     }
 
     bool number_float(json::number_float_t value, const std::string & /*unused*/) {
         print_comma();
-        std::cout << value;
+        o << value;
         return true;
     }
 
     bool string(const std::string &value) {
         print_comma();
-        std::cout << "\"" << value << "\"";
+        o << "\"" << value << "\"";
         return true;
     }
 
@@ -103,7 +112,7 @@ public:
 
     bool start_object(std::size_t /*unused*/) {
         print_comma();
-        std::cout << "{";
+        o << "{";
         last_value.push_back(1);
         // print_tab();
         return true;
@@ -113,20 +122,20 @@ public:
         print_comma();
         last_value.back() = 1; // do not print a comma when printing the value following this key
         print_tab();
-        std::cout << "\"" << key << "\": ";
+        o << "\"" << key << "\": ";
         return true;
     }
 
     bool end_object() {
         last_value.pop_back();
         print_tab();
-        std::cout << "}";
+        o << "}";
         return true;
     }
 
     bool start_array(bool tab = false) {
         print_comma();
-        std::cout << "[";
+        o << "[";
         last_value.push_back(1);
         if (tab) {
             print_tab();
@@ -139,7 +148,7 @@ public:
         if (tab) {
             print_tab();
         }
-        std::cout << "]";
+        o << "]";
         return true;
     }
 
@@ -147,14 +156,17 @@ public:
         return false;
     }
 
-    std::vector<bool> first_value;
+private:
+    // std::vector<bool> first_value;
     std::vector<int> last_value;
+    std::ofstream o;
+    // std::ostream& o;
 
 public:
     void print_tab() {
-        cout << endl;
+        o << endl;
         for (int i=0;i<last_value.size();i++) {
-            cout << "  ";
+            o << "  ";
         }
     }
 
@@ -163,7 +175,7 @@ public:
             switch (last_value.back())
             {
                 case 0:
-                    cout << ",";
+                    o << ",";
                     break;
                 case 1:
                     last_value.back() = 0;
@@ -279,8 +291,9 @@ void sax_test() {
         }]
     )"_json;
 
-    // std::cout << j << std::endl;
-    SaxPrinter p;
+    
+    // SaxWriter p(std::cout);
+    SaxWriter p("sax.json");
 
     sax_event_creator_nr(j, &p);
     cout << endl;
