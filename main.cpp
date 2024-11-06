@@ -290,6 +290,10 @@ void sax_test() {
             "b": 1
         }]
     )"_json;
+    j["2d"] = R"(
+        [[1,2,3],
+         [2,3,4]]
+    )"_json;
 
     
     // SaxWriter p(std::cout);
