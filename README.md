@@ -2,8 +2,9 @@
 
 ## cmake记录
 
-- `` 二维数组测试。
-- `5125664` 将 printer 更新为 writer，直接写出到文件。
+- `` 组合问题的遗传算法
+- `08af1af` 二维数组测试。
+- `5125661` 将 printer 更新为 writer，直接写出到文件。
 - `d02e4d8` 更新为 non recursive SAX event-based printer，避免递归调用。
 - `41dcfb4` 添加 SAX event-based printer，自定义打印格式，对于由基本元素组成的数组实现不换行打印。
 - `9fbfb92` json 嵌套对象与 c++ 嵌套对象的转换。
