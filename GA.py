@@ -3,8 +3,9 @@ import random
 random.seed(9638)
 np.random.seed(9638)
 import pandas as pd
+from copy import deepcopy
 
-candidate_ratios = [2] + list(range(8, 128, 8))
+repeat = 0
 
 # sig_ratio = np.array([
 sig_ratio = \
@@ -14,71 +15,136 @@ sig_ratio = \
     [6.41943] * 18 + \
     [6.42362] * 83
 # ])
-# mean_ratio = sig_ratio.mean()
-# print(mean_ratio)
 
-sig_num = len(sig_ratio)
+class DnaSlot:
+    def __init__(self, ctype_, ratio_, delay_):
+        self.ctype = ctype_
+        self.ratio = ratio_
+        self.delay = delay_
+        self.dna: int = 0
 
-pop_size = 5
-channel_num = 46
+class Organism:
+    def __init__(self, dna_slots_):
+        self.dna_slots = dna_slots_
+        self.dna = []
+        self.fitness = {}
+        self.ctype_max_ratio = {}
+        for dna_slot in self.dna_slots:
+            self.ctype_max_ratio[dna_slot.ctype] = dna_slot.ratio
+    def get_upper_channel_num(self, dna_slot_, a, b, s):
+        y = 0
+        if dna_slot_.ctype == 'a':
+            for x in range(a, -1, -1):
+                y = a - x
+                if (dna_slot_.ratio * x + self.ctype_max_ratio['a'] * y + self.ctype_max_ratio['b'] * b) >= s:
+                    return x
+        else:
+            for x in range(b, -1, -1):
+                y = b - x
+                if (dna_slot_.ratio * x + self.ctype_max_ratio['b'] * y + self.ctype_max_ratio['a'] * a) >= s:
+                    return x
+        return 0
 
-# print(mean_ratio, sig_num / channel_num)
+    def random_init(self, resources, s):
+        ctype_nums = deepcopy(resources)
+        max_channel_num_of_ratio = 0
+        channel_num_of_ratio = 0
+        for dna_slot in self.dna_slots:
+            max_channel_num_of_ratio = self.get_upper_channel_num(dna_slot, ctype_nums['a'], ctype_nums['b'], s)
+            if (dna_slot.ratio == self.ctype_max_ratio[dna_slot.ctype]):
+                channel_num_of_ratio = max_channel_num_of_ratio
+            else:
+                channel_num_of_ratio = int(np.random.choice(range(0, max_channel_num_of_ratio + 1)))
+            ctype_nums[dna_slot.ctype] -= channel_num_of_ratio
+            s = max(s - channel_num_of_ratio * dna_slot.ratio, 0)
+            dna_slot.dna = channel_num_of_ratio
 
-def get_upper_channel_num(a, b, channel_num, sig_num):
-    # ax + by >= sig_num
-    # x + y = channel_num
-    # get max a
-    for x in range(channel_num, -1, -1):
-        y = channel_num - x
-        if (a * x + b * y) >= sig_num:
-            return x
-    return 0
+    def random_init_unique(self, ctype_nums, s, dna_cache):
+        self.random_init(ctype_nums, s)
+        dna_key = tuple([dna_slot.dna for dna_slot in self.dna_slots])
+        repeat = 0
+        while dna_key in dna_cache:
+            repeat += 1
+            self.random_init(ctype_nums, s)
+            dna_key = tuple([dna_slot.dna for dna_slot in self.dna_slots])
+        dna_cache[dna_key] = 1
 
-pops = []
-def my_random(candidate_ratios, sig_num, channel_num):
-    channel_nums = []
-    for candidate_ratio in candidate_ratios[:-1]:
-        max_channel_num_of_ratio = get_upper_channel_num(candidate_ratio, candidate_ratios[-1], channel_num, sig_num)
-        channel_num_of_ratio = np.random.choice(range(0, max_channel_num_of_ratio + 1))
-        channel_num -= channel_num_of_ratio
-        sig_num -= channel_num_of_ratio * candidate_ratio
-        channel_nums.append(channel_num_of_ratio)
-    # last_channel_num = channel_num - sum(channel_nums)
-    if channel_num >= 0:
-        channel_nums.append(channel_num)
-    else:
-        raise "Error"
-    return channel_nums
+    def print(self):
+        print(f"dna sequence( {self.fitness} ): ", end='')
+        for dna_slot in self.dna_slots:
+            if dna_slot.dna:
+                print(f"{dna_slot.dna}({dna_slot.ctype} {dna_slot.ratio}),", end='')
+        print("")
 
-def calculate_loss(target_ratios, channel_nums, candidate_ratios):
-    ratios = []
-    for i, channel_num in enumerate(channel_nums):
-        ratios += [candidate_ratios[i]] * (candidate_ratios[i] * channel_num)
-    ratios = ratios[:len(target_ratios)]
-    loss = np.array(ratios) - np.array(target_ratios)
-    # print(loss)
-    return loss
+class GA:
+    def __init__(self, dna_slots_ : list[DnaSlot], pop_size_ : int, rest_pop_size_ : int, resources_, target_ : list[tuple]):
+        self.init = True
+        self.target = target_
+        self.pop_size = pop_size_
+        self.rest_pop_size = rest_pop_size_
+        self.loser_start = self.pop_size - self.rest_pop_size
+        self.dna_slots = dna_slots_
+        self.resources = resources_
+        self.pops : list[Organism] = []
+        self.dna_cache = {}
+        for i in range(self.pop_size):
+            self.pops.append(Organism(self.dna_slots))
+        for i in range(self.pop_size):
+            self.pops[i].random_init_unique(self.resources, len(self.target), self.dna_cache)
+        self.calculate_fitness()
+        self.pops.sort(key=lambda organism: (organism.fitness['max_loss'], organism.fitness['capacity']))
 
-def evolve(pops):
-    pass
+    def translate_dna(self, organism, behavior_ratios):
+        behavior_ratios.clear()
+        sig_num_of_ratio = 0
+        for dna_slot in organism.dna_slots:
+            if dna_slot.dna == 0:
+                continue
+            sig_num_of_ratio = dna_slot.ratio * dna_slot.dna
+            behavior_ratios.extend([dna_slot.ratio] * sig_num_of_ratio)
 
-target_ratios = [2] * 28 + [8] * 14 + [16] * 4
-target_ratios = [0] * (128//8)
-target_ratios[:3] = [28, 14, 4]
+    def calculate_fitness(self):
+        behavior_ratios = []
+        pops = self.pops if self.init else self.pops[self.loser_start:]
+        self.init = False if self.init else False
 
-for _ in range(50):
-    pops.append(my_random(candidate_ratios, sig_num, channel_num))
-pops.append(target_ratios)
+        for organism in pops:
+            self.translate_dna(organism, behavior_ratios)
+            max_loss = -100000
+            error = 0
+            for i, (origin_i, t) in enumerate(self.target):
+                error = t - behavior_ratios[i]
+                max_loss = max(max_loss, error)
+            organism.fitness['max_loss'] = max_loss
+            organism.fitness['capacity'] = len(behavior_ratios)
+            dna_key = tuple([dna_slot.dna for dna_slot in self.dna_slots])
+            self.dna_cache[dna_key] = 1
 
-loss = []
-mean_loss = []
-max_loss = []
-for pop in pops:
-    loss = calculate_loss(sig_ratio, pop, candidate_ratios)
-    mean_loss.append(loss.mean())
-    max_loss.append(loss.max())
-# print(loss)
-df = pd.DataFrame(pops, columns=candidate_ratios)
-df['mean_loss'] = mean_loss
-df['max_loss'] = max_loss
-print(df.sort_values(by=['max_loss', 'mean_loss']))
+    def evolve(self):
+        s = len(self.target)
+        for organism in self.pops[self.loser_start:]:
+            organism.random_init_unique(self.resources, s, self.dna_cache)
+        self.calculate_fitness()
+        self.pops.sort(key=lambda organism: (organism.fitness['max_loss'], organism.fitness['capacity']))
+        self.pops[0].print()
+
+    def assignment(self):
+        print(f"repeat time: {repeat}")
+        pass
+
+candidate_ratios_a = [2] + list(range(8, 128, 8))
+candidate_ratios_b = list(range(32, 512, 32))
+dna_slots = []
+for ratio in candidate_ratios_a:
+    dna_slots.append(DnaSlot('a', ratio, ratio * 0.625 + 30))
+for ratio in candidate_ratios_b:
+    dna_slots.append(DnaSlot('b', ratio, ratio * 0.078125 + 35))
+dna_slots.sort(key=lambda x:(x.delay, x.ratio))
+
+pop_size = 50
+sig_ratio = list(enumerate(sig_ratio))
+gaEngine = GA(dna_slots, pop_size, pop_size//2, {"a":10, "b":5}, sig_ratio)
+generation = 10
+for i in range(generation):
+    gaEngine.evolve()
+gaEngine.assignment()

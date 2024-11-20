@@ -2,7 +2,8 @@
 
 ## cmake记录
 
-- `` 组合问题的遗传算法
+- `` 一个完整的面向对象的遗传算法
+- `3f013b0` 组合问题的遗传算法
 - `08af1af` 二维数组测试。
 - `5125661` 将 printer 更新为 writer，直接写出到文件。
 - `d02e4d8` 更新为 non recursive SAX event-based printer，避免递归调用。
