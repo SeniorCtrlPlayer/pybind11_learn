@@ -34,11 +34,12 @@ public:
         slot_delay = dna_slot.slot_delay;
     }
 
-    DnaSlot(DnaSlot&& dna_slot) noexcept {
-        std::cout << "move constructor" << std::endl;
-    }
+    // DnaSlot(DnaSlot&& dna_slot) noexcept {
+    //     slot_type = std::move(dna_slot.slot_type);
+    //     std::cout << "move constructor" << std::endl;
+    // }
 
-    DnaSlot& operator=(DnaSlot&&) = default;
+    // DnaSlot& operator=(DnaSlot&&) = default;
 
     string slot_type;
     int slot_param;

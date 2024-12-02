@@ -31,7 +31,7 @@ void Organism::random_init(std::map<string, int> dna_nums, int constraint) {
     int dna_num_of_param = 0;
     for (DnaSlot& dna_slot : dna_slots) {
         max_dna_num_of_param = get_upper_dna_num(dna_slot, dna_nums, constraint);
-        if (dna_slot.slot_param = type_last_param[dna_slot.slot_type]) {
+        if (dna_slot.slot_param == type_last_param[dna_slot.slot_type]) {
             dna_num_of_param = max_dna_num_of_param;
         } else {
             dna_num_of_param = mean_random(0, max_dna_num_of_param);
@@ -49,13 +49,16 @@ void Organism::random_init_unique(std::map<string, int> dna_nums, int constraint
         dna_key[i] = dna_slots[i].dna;
     }
 
+    int current_repeat = 0;
     while (dna_cache.find(dna_key) != dna_cache.end()) {
         repeat++;
+        current_repeat += 1;
         random_init(dna_nums, constraint);
         for (int i=0; i<dna_key.size(); i++) {
             dna_key[i] = dna_slots[i].dna;
         }
     }
+    std::cout << "find a unique dna_sequence" << std::endl;
     dna_cache.insert({dna_key, 1});
 }
 
