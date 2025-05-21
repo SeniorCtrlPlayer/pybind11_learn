@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 project(Student)
+# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0 -ggdb")
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -ggdb")
 set(pybind11_DIR /home/admin/software/miniconda3/lib/python3.12/site-packages/pybind11/share/cmake/pybind11)
 set(PYTHON_EXECUTABLE "/home/admin/software/miniconda3/bin/python")
 

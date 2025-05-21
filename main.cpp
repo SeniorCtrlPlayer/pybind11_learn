@@ -1,5 +1,6 @@
 #include "Student.h"
 #include <fstream>
+#include <stack>
 
 class class_room {
     public:
@@ -55,100 +56,169 @@ void json_test() {
     return;
 }
 
+enum last_type {
+    PRIMITIVE,
+    OBJECT_START,
+    OBJECT_END,
+    ARRAY_START,
+    ARRAY_END,
+    KEY
+};
+
 class SaxWriter {
 public:
-    SaxWriter(const string& file_name) {
-        o = std::ofstream(file_name);
-        if (!o.is_open()) {
-            cerr << "open file failed" << endl;
-            return;
-        }
+    // SaxWriter(const string& file_name, int max_depth_ = 10) {
+    //     o = std::ofstream(file_name);
+    //     if (!o.is_open()) {
+    //         cerr << "open file failed" << endl;
+    //         return;
+    //     }
+    //     max_depth = max_depth_;
+    // }
+    SaxWriter(ostream& out, int max_depth_ = 10) : o(out), max_depth(max_depth_) {
+        // o = out;
+        // max_depth = max_depth_;
     }
     // SaxWriter(std::ostream& out) : o(out) {}
     ~SaxWriter() {
-        o.close();
-        assert(last_value.empty());
+        // o.close();
+        // assert(last_value.empty());
     }
 
     bool null() {
-        print_comma();
-        o << "null";
-        return true;
-    }
-
+        if (last_state == PRIMITIVE) o << ',';
+        o << "null"; return true;}
     bool boolean(bool value) {
-        print_comma();
-        o << (value ? "true" : "false");
-        return true;
-    }
-
+        if (last_state == PRIMITIVE) o << ',';
+        o << (value ? "true" : "false"); last_state=PRIMITIVE; return true;}
     bool number_integer(json::number_integer_t value) {
-        print_comma();
-        o << value;
-        return true;
-    }
-
+        if (last_state == PRIMITIVE) o << ',';
+        o << value; last_state=PRIMITIVE; return true;}
     bool number_unsigned(json::number_unsigned_t value) {
-        print_comma();
-        o << value;
-        return true;
-    }
-
+        if (last_state == PRIMITIVE) o << ',';
+        o << value; last_state=PRIMITIVE; return true;}
     bool number_float(json::number_float_t value, const std::string & /*unused*/) {
-        print_comma();
-        o << value;
-        return true;
-    }
-
+        if (last_state == PRIMITIVE) o << ',';
+        o << value; last_state=PRIMITIVE; return true;}
     bool string(const std::string &value) {
-        print_comma();
-        o << "\"" << value << "\"";
-        return true;
-    }
+        if (last_state == PRIMITIVE) o << ',';
+        o << "\"" << value << "\""; last_state=PRIMITIVE; return true;}
+    bool binary(std::vector<std::uint8_t> & /*unused*/) {last_state=PRIMITIVE; return true;}
 
-    bool binary(std::vector<std::uint8_t> & /*unused*/) {
-        return true;
-    }
-
-    bool start_object(std::size_t /*unused*/) {
-        print_comma();
+    bool start_object() {
+        // depth++;
+        switch (last_state)
+        {
+        case OBJECT_END:
+            // o << ',';
+            print_comma();
+            print_tab();
+            break;
+        case ARRAY_END:
+            print_comma();
+            print_tab();
+            // o << ',';
+            break;
+        case ARRAY_START:
+            // print_comma();
+            print_tab();
+            break;
+        case KEY:
+            break;
+        default:
+            break;
+        }
         o << "{";
-        last_value.push_back(1);
-        // print_tab();
+        // o << depth;
+        last_state = last_type::OBJECT_START;
         return true;
     }
 
     bool key(const std::string &key) {
-        print_comma();
-        last_value.back() = 1; // do not print a comma when printing the value following this key
-        print_tab();
+        // if (last_state>PRIMITIVE)
+        //     depth++;
+        switch (last_state)
+        {
+        case PRIMITIVE:
+            print_comma();
+            print_tab();
+            break;
+        case OBJECT_START:
+            depth++;
+            print_tab();
+            break;
+        case ARRAY_END:
+            print_comma();
+            print_tab();
+            break;
+        case OBJECT_END:
+            print_comma();
+            print_tab();
+            break;
+        default:
+            break;
+        }
+        // print_comma();
+        // print_tab();
         o << "\"" << key << "\": ";
+        last_state = KEY;
         return true;
     }
 
     bool end_object() {
-        last_value.pop_back();
-        print_tab();
+        if (depth == max_depth) {
+            print_tab();
+            depth--;
+        } else {
+            depth--;
+            print_tab();
+        }
         o << "}";
+        last_state = last_type::OBJECT_END;
         return true;
     }
 
     bool start_array(bool tab = false) {
-        print_comma();
-        o << "[";
-        last_value.push_back(1);
-        if (tab) {
+        switch (last_state)
+        {
+        case ARRAY_END:
+            print_comma();
+            depth++;
             print_tab();
+            break;
+        case ARRAY_START:
+            depth++;
+            print_tab();
+            break;
+        case KEY:
+            depth++;
+            break;
+        default:
+            break;
         }
+        o << "[";
+        // depth++;
+        last_state = last_type::ARRAY_START;
         return true;
     }
 
     bool end_array(bool tab = false) {
-        last_value.pop_back();
-        if (tab) {
+        depth--;
+        switch (last_state)
+        {
+        case ARRAY_END:
             print_tab();
+            break;
+        case OBJECT_END:
+            // print_comma();
+            print_tab();
+            break;
+        default:
+            break;
         }
         o << "]";
+        // last_value.back() = last_type::ARRAY_END;
+        last_state = last_type::ARRAY_END;
         return true;
     }
 
@@ -157,132 +227,121 @@ public:
     }
 
 private:
-    // std::vector<bool> first_value;
-    std::vector<int> last_value;
-    std::ofstream o;
-    // std::ostream& o;
+    std::vector<last_type> last_value = {last_type::OBJECT_START}; // 标记每步值是否为基础类型或者非基础类型
+    int max_depth;
+    int depth = 0;
+    std::ostream& o;
+    last_type last_state = last_type::OBJECT_START;
 
 public:
-    void print_tab() {
-        o << endl;
-        for (int i=0;i<last_value.size();i++) {
-            o << "  ";
-        }
-    }
+    // 是否要打印 [',', ' ', '\n'] 由下个字符决定
 
     void print_comma() {
-        if (!last_value.empty()) {
-            switch (last_value.back())
-            {
-                case 0:
-                    o << ",";
-                    break;
-                case 1:
-                    last_value.back() = 0;
-                    break;
-                default:
-                    break;
-            }
+        o << ',';
+    }
+
+    void print_tab() {
+        if (depth >= max_depth)
+            return;
+        o << std::endl;
+        for (int i=0;i<depth; i++) {
+            o << "  ";
         }
     }
 };
 
+// 定义栈帧结构体
+struct Frame {
+    const json* node;   // 当前 JSON 节点
+    bool visited;       // 是否已访问过
+    std::string key;    // 对象成员的键名，数组元素或根节点为空
+};
+
 template<class Sax>
-void sax_event_creator_nr(const json &j, Sax *sax) {
-    auto handle_primitive_value = [](json::const_iterator it, Sax *sax) {
-        switch (it.m_object->type()) {
-            case nlohmann::json::value_t::number_integer: {
-                sax->number_integer(it->template get<json::number_integer_t>());
-                break;
-            }
+void sax_event_creator_nr(const json &root, Sax *sax) {
+    std::stack<Frame> st;
+    // 将根节点入栈，标记为“未访问”
+    st.push({&root, false, ""});
+    // st.emplace(&root, false, std::string(""));
 
-            case nlohmann::detail::value_t::number_unsigned: {
-                sax->number_unsigned(it->template get<json::number_unsigned_t>());
-                break;
-            }
+    while (!st.empty()) {
+        // pop 出栈顶帧
+        Frame frame = st.top();  
+        st.pop();
+        const json* node = frame.node;
 
-            case nlohmann::detail::value_t::number_float: {
-                sax->number_float(it->template get<json::number_float_t>(), "");
-                break;
-            }
+        // 如果是原子值（非 object/array），且未访问，则直接分发一次
+        if (!node->is_object() && !node->is_array()) {
+            if (!frame.key.empty()) sax->key(frame.key);
 
-            case nlohmann::detail::value_t::null: {
-                sax->null();
-                break;
-            }
-
-            case nlohmann::detail::value_t::string: {
-                sax->string(it->template get_ref<const json::string_t &>());
-                break;
-            }
-
-            case nlohmann::detail::value_t::boolean: {
-                sax->boolean(it->template get<const json::boolean_t>());
-                break;
-            }
-
-            default:
-                break;
-        }
-    };
-
-    if (j.is_primitive()) {
-        handle_primitive_value(j.cbegin(), sax);
-        return;
-    }
-
-    std::vector<json::const_iterator> m_stack;
-    m_stack.push_back(j.cbegin());
-
-    while (!m_stack.empty()) {
-        auto &it = m_stack.back();
-        assert(it.m_object->is_structured());
-        const auto is_object = it.m_object->is_object();
-        std::size_t size = false;
-
-        // start before the first value
-        if (it == it.m_object->cbegin()) {
-            size = it.m_object->size();
-            // is_object ? sax->start_object(size) : sax->start_array(size);
-            if (is_object) {
-                sax->start_object(size);
-            } else {
-                bool tab = size && (it.m_object->cbegin()->is_object() || it.m_object->cbegin()->is_array());
-                sax->start_array(tab);
-            }
-        }
-
-        // end after the last value
-        if (it == it.m_object->end()) {
-            size = it.m_object->size();
-            if (is_object) {
-                sax->end_object();
-            } else {
-                bool tab = size && (it.m_object->cbegin()->is_object() || it.m_object->cbegin()->is_array());
-                sax->end_array(tab);
-            }
-            m_stack.pop_back();
+            if (node->is_number_integer()) sax->number_integer(node->get<json::number_integer_t>());
+            else if (node->is_number_unsigned()) sax->number_unsigned(node->get<json::number_unsigned_t>());
+            else if (node->is_number_float())    sax->number_float(node->get<json::number_float_t>(), "");
+            else if (node->is_string())          sax->string(node->get_ref<const json::string_t&>());
+            else if (node->is_boolean())         sax->boolean(node->get<bool>());
+            else /* null */                      sax->null();
             continue;
         }
 
-        // handle the current value
-        if (is_object) {
-            sax->key(it.key());
+        // 容器类型（object 或 array）
+        bool is_obj = node->is_object();
+
+        if (!frame.visited) {
+            // 首次访问：触发 start_*
+            if (!frame.key.empty()) sax->key(frame.key);
+            if (is_obj)       sax->start_object();
+            else /* array */  sax->start_array(false);
+
+            // 将自己标记为“已访问”重新入栈，以便稍后触发 end_*
+            st.push(Frame{frame.node, true, frame.key});
+
+            // 以深度优先顺序反序压入所有子节点
+            if (is_obj) {
+                for (json::const_reverse_iterator rit = node->rbegin(); rit != node->rend(); ++rit) {
+                    st.push(Frame{&*rit, false, rit.key()});
+                }
+            } else {
+                // 数组元素：倒序入栈
+                for (json::const_reverse_iterator rit = node->rbegin(); rit != node->rend(); ++rit) {
+                    st.push(Frame{&*rit, false, ""});
+                }
+            }
         }
-        auto it_current = it++->cbegin();
-        if (it_current.m_object->is_primitive()) {
-            handle_primitive_value(it_current, sax);
-        } else {
-            m_stack.push_back(it_current);
+        else {
+            // 二次访问：触发 end_*
+            if (is_obj)       sax->end_object();
+            else /* array */  sax->end_array(false);
         }
     }
 }
+
+class RouteLog {
+public:
+    int log_id;
+    std::vector<std::vector<unsigned int>> multi_fanout_path;
+    RouteLog() = default;
+    RouteLog(int log_id_, std::vector<std::vector<unsigned int>>&& multi_fanout_path_) : log_id(log_id_), multi_fanout_path(std::move(multi_fanout_path_)) {}
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(RouteLog, log_id, multi_fanout_path)
+};
+class RouteNet {
+public:
+    std::string net_name;
+    std::vector<RouteLog> route_logs;
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(RouteNet, net_name, route_logs)
+};
+class RouteNetLogs {
+public:
+    std::map<std::string, RouteNet> route_net_map;
+    std::map<int, std::string> comments;
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(RouteNetLogs, route_net_map, comments)
+};
 
 void sax_test() {
     json j;
     j["foo"][2] = false;
     j["bar"]["number"] = 10;
     j["bar"]["null"] = nullptr;
+    j["booltest"] = true;
     j["bar1"] = R"(
         [{
             "a": "b"
@@ -295,22 +354,41 @@ void sax_test() {
          [2,3,4]]
     )"_json;
 
+    // RouteLog rlog1 = RouteLog(1, {{1, 2, 3}, {2,3,4}});
+    // RouteLog rlog2 = RouteLog(2, {{1, 2, 3}, {2,3,4}});
+    // RouteLog rlog3 = RouteLog(3, {{1, 2, 3}, {2,3,4}});
+    auto rpath1 = std::vector<std::vector<unsigned int>>({{1, 2, 3}, {2,3,4}});
+    auto rpath2 = std::vector<std::vector<unsigned int>>({{1, 2, 3}, {2,3,4}});
+    auto rpath3 = std::vector<std::vector<unsigned int>>({{1, 2, 3}, {2,3,4}});
     
-    // SaxWriter p(std::cout);
-    SaxWriter p("sax.json");
+    RouteNet rnet1;
+    rnet1.net_name = "r1";
+    rnet1.route_logs.emplace_back(1, std::move(rpath1));
+    rnet1.route_logs.emplace_back(2, std::move(rpath2));
+    RouteNet rnet2;
+    rnet2.net_name = "r2";
+    rnet2.route_logs.emplace_back(3, std::move(rpath3));
+    RouteNetLogs r;
+    r.route_net_map["r1"] = rnet1;
+    r.route_net_map["r2"] = rnet2;
+    json rjson;
+    rjson["checkpoint"] = r;
 
-    sax_event_creator_nr(j, &p);
+    // SaxWriter p(std::cout);
+    // SaxWriter p("sax.json", 8);
+    std::cout << std::unitbuf;
+    SaxWriter p(std::cout, 6);
+
+    sax_event_creator_nr(rjson, &p);
     cout << endl;
-    // json::sax_parse(R"([[],[{},{}],{}])", &p);
-    // std::cout << std::endl;
 }
 
 int main(int argc, char** argv) {
-    Student* s = new Student(1);
-    s->print();
-    delete s;
+    // Student* s = new Student(1);
+    // s->print();
+    // delete s;
 
-    json_test();
+    // json_test();
 
     sax_test();
     return 0;
